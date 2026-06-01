@@ -1,0 +1,24 @@
+{
+	"folders": [
+		{
+			"path": "../Ibeacon"
+		},
+		{
+			"name": "TheIbeacon",
+			"path": "../TheIbeacon"
+		},
+		{
+			"name": "ESP1",
+			"path": "../ESP1"
+		},
+		{
+			"name": "ESP2",
+			"path": "../ESP2"
+		},
+		{
+			"name": "ESP3",
+			"path": "."
+		}
+	],
+	"settings": {}
+}
