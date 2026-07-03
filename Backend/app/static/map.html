@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>ProxiSearch – Localisation temps réel</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; background: #1a1a2e; color: #eee; }
+    h2 { color: #4fc3f7; }
+    canvas { border: 2px solid #4fc3f7; background: #16213e; }
+    .info { margin-top: 10px; font-size: 14px; }
+    .phone-entry { margin: 4px 0; }
+  </style>
+</head>
+<body>
+  <h2>📡 Localisation des téléphones (salle 5,60 m × 4,60 m)</h2>
+  <canvas id="canvas" width="560" height="460"></canvas>
+  <div id="phones"></div>
+
+  <script>
+    const BASE_URL = window.location.origin;
+    const W = 5.60, H = 4.60;
+    const SCALE = 100;
+
+    const esp = {
+      A: [0, 0],
+      B: [0, 4.60],
+      C: [5.60, 2.30]
+    };
+
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+
+    function toScreen(x, y) {
+      return { sx: x * SCALE, sy: canvas.height - y * SCALE };
+    }
+
+    function drawBackground() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      // Sous‑grille tous les 40 cm
+      ctx.strokeStyle = "#2a2a4a";
+      ctx.lineWidth = 0.5;
+      for (let x = 0; x <= W; x += 0.4) {
+        let p = toScreen(x, 0);
+        ctx.beginPath(); ctx.moveTo(p.sx, 0); ctx.lineTo(p.sx, canvas.height); ctx.stroke();
+      }
+      for (let y = 0; y <= H; y += 0.4) {
+        let p = toScreen(0, y);
+        ctx.beginPath(); ctx.moveTo(0, p.sy); ctx.lineTo(canvas.width, p.sy); ctx.stroke();
+      }
+      // Grille tous les 1 m
+      ctx.strokeStyle = "#4a4a6a";
+      ctx.lineWidth = 0.8;
+      for (let x = 0; x <= W; x += 1.0) {
+        let p = toScreen(x, 0);
+        ctx.beginPath(); ctx.moveTo(p.sx, 0); ctx.lineTo(p.sx, canvas.height); ctx.stroke();
+      }
+      for (let y = 0; y <= H; y += 1.0) {
+        let p = toScreen(0, y);
+        ctx.beginPath(); ctx.moveTo(0, p.sy); ctx.lineTo(canvas.width, p.sy); ctx.stroke();
+      }
+      // Contour salle
+      ctx.strokeStyle = "#4fc3f7";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(0, 0, canvas.width, canvas.height);
+      // ESP32
+      for (let id in esp) {
+        let [ex, ey] = esp[id];
+        let p = toScreen(ex, ey);
+        ctx.beginPath();
+        ctx.arc(p.sx, p.sy, 6, 0, 2 * Math.PI);
+        ctx.fillStyle = (id === 'A' ? 'red' : (id === 'B' ? 'green' : 'blue'));
+        ctx.fill();
+        ctx.fillStyle = "#fff";
+        ctx.font = "bold 12px Arial";
+        ctx.fillText("ESP " + id, p.sx + 10, p.sy + 4);
+      }
+    }
+
+    // Palette de couleurs pour différencier les téléphones
+    const colorPalette = ["#4fc3f7", "#ff9800", "#e91e63", "#00e676", "#ffeb3b", "#9c27b0"];
+    let macColorMap = {};
+    function getColor(mac) {
+      if (!macColorMap[mac]) {
+        let idx = Object.keys(macColorMap).length % colorPalette.length;
+        macColorMap[mac] = colorPalette[idx];
+      }
+      return macColorMap[mac];
+    }
+
+    function drawAllPoints(phoneList) {
+      drawBackground();  // redessine le fond
+      for (let phone of phoneList) {
+        let x = phone.x, y = phone.y;
+        if (x === 0 && y === 0) continue;
+        let p = toScreen(x, y);
+        let color = getColor(phone.mac);
+        ctx.beginPath();
+        ctx.arc(p.sx, p.sy, 7, 0, 2 * Math.PI);
+        ctx.fillStyle = color;
+        ctx.fill();
+        ctx.fillStyle = "#fff";
+        ctx.font = "bold 12px Arial";
+        ctx.fillText("📱", p.sx - 10, p.sy - 10);
+      }
+    }
+
+    function updatePhoneList(phoneList) {
+      let html = "";
+      for (let phone of phoneList) {
+        let color = getColor(phone.mac);
+        html += `<div class="phone-entry" style="color:${color}">`
+             +  `Tél ${phone.mac.slice(-5)} : x=${phone.x.toFixed(2)} m, y=${phone.y.toFixed(2)} m`
+             +  ` — RSSI A:${phone.rssi.A != null ? Math.round(phone.rssi.A) : '--'}`
+             +  ` B:${phone.rssi.B != null ? Math.round(phone.rssi.B) : '--'}`
+             +  ` C:${phone.rssi.C != null ? Math.round(phone.rssi.C) : '--'}`
+             +  `</div>`;
+      }
+      document.getElementById('phones').innerHTML = html || "<p>Aucun téléphone détecté.</p>";
+    }
+
+    async function updatePositions() {
+      try {
+        const resp = await fetch(`${BASE_URL}/api/position/all?_=${new Date().getTime()}`);
+        if (!resp.ok) return;
+        const data = await resp.json();
+        drawAllPoints(data);
+        updatePhoneList(data);
+      } catch (e) {
+        console.error("Erreur de mise à jour :", e);
+      }
+    }
+
+    drawBackground();
+    updatePositions();
+    setInterval(updatePositions, 1000);
+  </script>
+</body>
+</html>
