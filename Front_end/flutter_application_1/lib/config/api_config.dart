@@ -4,7 +4,7 @@ class ApiConfig {
   ApiConfig._();
 
   static const _port = 8000;
-  static const String pcHostOverride = '192.168.100.127';
+  static const String pcHostOverride = '192.168.11.106';
 
   static String get baseUrl {
     const customHost = String.fromEnvironment('API_HOST');
@@ -29,6 +29,7 @@ class ApiConfig {
   static String get standsSuppression => '$baseUrl/stands/suppression';
   static String get standsVerrouillerPosition =>
       '$baseUrl/stands/verrouiller-position';
+  static String get standsDashboardStats => '$baseUrl/stands/dashboard-stats';
 
   static String get positionLatest => '$baseUrl/api/position/latest';
   static String get positionAll => '$baseUrl/api/position/all';
@@ -62,6 +63,10 @@ class ApiConfig {
 
   static String get promotionsCreation => '$baseUrl/promotions/creation';
   static String get promotionsMes => '$baseUrl/promotions/mes-promotions';
+  static String promotionModification(String id) =>
+      '$baseUrl/promotions/modification/$id';
+  static String promotionSuppression(String id) =>
+      '$baseUrl/promotions/suppression/$id';
 
   static String get ibeaconMon => '$baseUrl/ibeacons/mon-ibeacon';
   static String get ibeaconCreation => '$baseUrl/ibeacons/';

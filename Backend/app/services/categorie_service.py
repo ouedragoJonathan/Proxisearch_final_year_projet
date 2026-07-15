@@ -4,12 +4,22 @@ from beanie import PydanticObjectId
 from app.models.categories import Categorie
 from app.models.stand import Stand
 from app.models.vendeur import Vendeur
-from app.schemas.categorie import CategorieCreate, CategorieUpdate
+from app.schemas.categorie import CategorieCreate, CategorieUpdate, CategorieResponse
 
 class CategorieService:
 
     @staticmethod
-    async def creer_categorie(donnees: CategorieCreate, vendeur_actuel: Vendeur) -> Categorie:
+    def _to_response(categorie: Categorie) -> CategorieResponse:
+        return CategorieResponse(
+            id=categorie.id,
+            nom=categorie.nom,
+            description=categorie.description,
+            icone_url=categorie.icone_url,
+            produits=[],
+        )
+
+    @staticmethod
+    async def creer_categorie(donnees: CategorieCreate, vendeur_actuel: Vendeur) -> CategorieResponse:
         try:
             # 1. Trouver le stand du vendeur connecté
             stand = await Stand.find_one(Stand.vendeur.id == vendeur_actuel.id)
@@ -31,7 +41,7 @@ class CategorieService:
             stand.categories.append(nouvelle_categorie)
             await stand.save()
 
-            return nouvelle_categorie
+            return CategorieService._to_response(nouvelle_categorie)
 
         except HTTPException as he:
             raise he
@@ -41,7 +51,7 @@ class CategorieService:
             raise HTTPException(status_code=500, detail="Erreur interne. Regardez le terminal.")
 
     @staticmethod
-    async def modifier_categorie(categorie_id: PydanticObjectId, donnees: CategorieUpdate, vendeur_actuel: Vendeur) -> Categorie:
+    async def modifier_categorie(categorie_id: PydanticObjectId, donnees: CategorieUpdate, vendeur_actuel: Vendeur) -> CategorieResponse:
         try:
             # 1. Trouver le stand du vendeur
             stand = await Stand.find_one(Stand.vendeur.id == vendeur_actuel.id)
@@ -69,7 +79,7 @@ class CategorieService:
                 setattr(categorie, key, value)
                 
             await categorie.save()
-            return categorie
+            return CategorieService._to_response(categorie)
 
         except HTTPException as he:
             raise he

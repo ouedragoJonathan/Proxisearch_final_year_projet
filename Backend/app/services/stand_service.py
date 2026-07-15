@@ -1,4 +1,5 @@
 from fastapi import HTTPException, status
+from beanie import PydanticObjectId
 from app.models.stand import Stand
 from app.models.vendeur import Vendeur
 from app.models.categories import Categorie
@@ -14,6 +15,16 @@ class StandService:
     """
     Logique métier pour la gestion des stands.
     """
+
+    @staticmethod
+    async def trouver_par_categorie(categorie_id: PydanticObjectId) -> Stand | None:
+        """Trouve le stand contenant une catégorie (requête MongoDB fiable)."""
+        return await Stand.find_one({
+            "$or": [
+                {"categories.$id": categorie_id},
+                {"categories": categorie_id},
+            ]
+        })
 
     @staticmethod
     async def creer_stand(donnees: StandCreate, vendeur_actuel: Vendeur) -> Stand:
@@ -131,6 +142,54 @@ class StandService:
 
         lock_phone_position(mac, (stand.position_x, stand.position_y))
         return await StandService.obtenir_stand_du_vendeur(vendeur_actuel)
+
+    @staticmethod
+    async def enregistrer_clic_notification(stand_id: str) -> dict:
+        """Incrémente le compteur de clics sur notification pour un stand."""
+        from beanie import PydanticObjectId
+
+        try:
+            oid = PydanticObjectId(stand_id)
+        except Exception:
+            raise HTTPException(status_code=404, detail="Stand introuvable.")
+
+        stand = await Stand.get(oid)
+        if not stand:
+            raise HTTPException(status_code=404, detail="Stand introuvable.")
+
+        stand.clics_notif = (stand.clics_notif or 0) + 1
+        await stand.save()
+        return {"detail": "Clic enregistré.", "clics_notif": stand.clics_notif}
+
+    @staticmethod
+    async def obtenir_stats_dashboard(vendeur_actuel: Vendeur) -> dict:
+        """Statistiques du stand pour le dashboard vendeur."""
+        from app.models.promotion import Promotion
+
+        stand = await StandService.obtenir_stand_du_vendeur(vendeur_actuel)
+        total_produits = 0
+        produits_disponibles = 0
+
+        for categorie in stand.categories or []:
+            await categorie.fetch_link(Categorie.produits)
+            for produit in categorie.produits or []:
+                total_produits += 1
+                if getattr(produit, "disponibilte", True):
+                    produits_disponibles += 1
+
+        promotions = await Promotion.find(
+            Promotion.vendeur_id == vendeur_actuel.id
+        ).to_list()
+
+        return {
+            "nom_stand": stand.nom_du_stand,
+            "clics_notif": stand.clics_notif or 0,
+            "produits_disponibles": produits_disponibles,
+            "total_produits": total_produits,
+            "nombre_categories": len(stand.categories or []),
+            "promotions_actives": len(promotions),
+            "position_verrouillee": stand.position_verrouillee,
+        }
 
     @staticmethod
     async def obtenir_stand_par_id(stand_id: str) -> Stand:

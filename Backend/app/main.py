@@ -126,5 +126,5 @@ async def debug_exception_handler(request, exc):
     # On renvoie quand même une 500 pour ne pas casser Postman
     return JSONResponse(
         status_code=500,
-        content={"detail": "Erreur critique. Regarde le terminal !"}
+        content={"detail": str(exc) or "Erreur critique. Regarde le terminal !"}
     )

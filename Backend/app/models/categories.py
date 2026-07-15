@@ -5,7 +5,7 @@ from .produits import Produit
 class Categorie(Document):
     nom: str
     description: str
-    icone_url: str
+    icone_url: str = ""
     produits: List[Link[Produit]] = []
 
     class Settings:

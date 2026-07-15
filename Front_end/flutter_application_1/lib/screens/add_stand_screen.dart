@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/marketplace_service.dart';
 import '../theme/app_colors.dart';
+import 'lock_position_screen.dart';
 
 class AddStandScreen extends StatefulWidget {
   const AddStandScreen({super.key});
@@ -14,25 +15,20 @@ class _AddStandScreenState extends State<AddStandScreen> {
   final _service = MarketplaceService();
   final _nomController = TextEditingController();
   final _descController = TextEditingController();
-  final _positionController = TextEditingController();
   bool _saving = false;
 
   @override
   void dispose() {
     _nomController.dispose();
     _descController.dispose();
-    _positionController.dispose();
     super.dispose();
   }
 
   Future<void> _save() async {
     final nom = _nomController.text.trim();
-    final position = _positionController.text.trim();
-    if (nom.isEmpty || position.isEmpty) {
+    if (nom.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Le nom et la position du stand sont requis'),
-        ),
+        const SnackBar(content: Text('Le nom du stand est requis')),
       );
       return;
     }
@@ -42,9 +38,24 @@ class _AddStandScreenState extends State<AddStandScreen> {
       await _service.creerStand(
         nomDuStand: nom,
         description: _descController.text.trim(),
-        position: position,
+        position: 'Position GPS à verrouiller',
       );
       if (!mounted) return;
+
+      final locked = await Navigator.of(context).push<bool>(
+        MaterialPageRoute(builder: (_) => const LockPositionScreen()),
+      );
+      if (!mounted) return;
+
+      if (locked != true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Stand créé. Verrouillez votre position depuis le dashboard.',
+            ),
+          ),
+        );
+      }
       Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
@@ -107,11 +118,55 @@ class _AddStandScreenState extends State<AddStandScreen> {
                 'Décrivez les produits, l\'ambiance, vos spécialités...',
               ),
             ),
-            const SizedBox(height: 16),
-            _label('Position (Allée / Emplacement)'),
-            TextField(
-              controller: _positionController,
-              decoration: _input('Ex: Allée C, Emplacement 12'),
+            const SizedBox(height: 20),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: AppColors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: const Border(
+                  left: BorderSide(color: AppColors.oliveGreen, width: 4),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'LOCALISATION GPS',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textGrey.withValues(alpha: 0.8),
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    height: 100,
+                    decoration: BoxDecoration(
+                      color: AppColors.lightGrey.withValues(alpha: 0.6),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Center(
+                      child: Icon(
+                        Icons.location_searching,
+                        size: 40,
+                        color: AppColors.oliveGreen,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Après l\'enregistrement, vous pourrez verrouiller votre position '
+                    'GPS sur le marché grâce au Wi-Fi (comme pour une catégorie de stand).',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textGrey.withValues(alpha: 0.85),
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: 32),
             SizedBox(
@@ -124,7 +179,7 @@ class _AddStandScreenState extends State<AddStandScreen> {
                         height: 18,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
-                          color: AppColors.white,
+                          color: AppColors.darkOlive,
                         ),
                       )
                     : const Icon(Icons.check_circle_outline),

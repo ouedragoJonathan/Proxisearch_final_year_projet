@@ -1,5 +1,12 @@
 from fastapi import APIRouter, Depends, status
-from app.schemas.stand import StandCreate, StandUpdate, StandResponse, VerrouillerPositionRequest
+from app.schemas.stand import (
+    StandCreate,
+    StandUpdate,
+    StandResponse,
+    VerrouillerPositionRequest,
+    NotificationClickRequest,
+    DashboardStatsResponse,
+)
 from app.services.stand_service import StandService
 from app.models.vendeur import Vendeur
 from app.core.security import get_current_vendeur
@@ -44,3 +51,15 @@ async def verrouiller_position_stand(
 ):
     """Verrouille la position x/y du stand depuis la trilatération Wi-Fi live."""
     return await StandService.verrouiller_position(donnees.phone_mac, vendeur_actuel)
+
+
+@router.get("/dashboard-stats", response_model=DashboardStatsResponse)
+async def stats_dashboard(vendeur_actuel: Vendeur = Depends(get_current_vendeur)):
+    """Statistiques du stand pour le dashboard vendeur."""
+    return await StandService.obtenir_stats_dashboard(vendeur_actuel)
+
+
+@router.post("/clic-notification")
+async def enregistrer_clic_notification(donnees: NotificationClickRequest):
+    """Enregistre un clic acheteur sur une notification promo (sans auth)."""
+    return await StandService.enregistrer_clic_notification(donnees.stand_id)

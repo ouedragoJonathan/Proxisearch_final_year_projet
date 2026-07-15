@@ -46,18 +46,12 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       if (_isSignUp) {
         await _vendeurService.inscription(
-          VendeurCreate(
-            numTelephone: numTelephone,
-            motDePasse: motDePasse,
-          ),
+          VendeurCreate(numTelephone: numTelephone, motDePasse: motDePasse),
         );
       }
 
       final response = await _vendeurService.connexion(
-        VendeurLogin(
-          numTelephone: numTelephone,
-          motDePasse: motDePasse,
-        ),
+        VendeurLogin(numTelephone: numTelephone, motDePasse: motDePasse),
       );
 
       await TokenStorage.saveSession(
@@ -94,15 +88,15 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.white,
+      backgroundColor: AppColors.cream,
       body: SingleChildScrollView(
         child: Column(
           children: [
@@ -112,7 +106,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   clipper: const WaveClipper(waveHeight: 90, inverted: true),
                   child: Container(
                     height: MediaQuery.of(context).size.height * 0.38,
-                    color: AppColors.oliveGreen,
+                    color: AppColors.sageGreen,
                   ),
                 ),
                 SizedBox(
@@ -230,8 +224,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.oliveGreen,
                         foregroundColor: AppColors.white,
-                        disabledBackgroundColor:
-                            AppColors.oliveGreen.withValues(alpha: 0.6),
+                        disabledBackgroundColor: AppColors.oliveGreen
+                            .withValues(alpha: 0.6),
                         elevation: 0,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(30),

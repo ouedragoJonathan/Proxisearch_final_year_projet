@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/promotion.dart';
 import '../services/marketplace_service.dart';
 import '../theme/app_colors.dart';
+import 'edit_promotion_screen.dart';
 
 class DealsScreen extends StatefulWidget {
   const DealsScreen({super.key});
@@ -109,7 +110,17 @@ class _DealsScreenState extends State<DealsScreen> {
                   separatorBuilder: (_, _) => const SizedBox(height: 12),
                   itemBuilder: (context, index) {
                     final promo = _promotions[index];
-                    return Container(
+                    return GestureDetector(
+                      onTap: () async {
+                        final updated = await Navigator.of(context).push<bool>(
+                          MaterialPageRoute(
+                            builder: (_) =>
+                                EditPromotionScreen(promotion: promo),
+                          ),
+                        );
+                        if (updated == true) _load();
+                      },
+                      child: Container(
                       padding: const EdgeInsets.all(18),
                       decoration: BoxDecoration(
                         color: AppColors.white,
@@ -170,6 +181,7 @@ class _DealsScreenState extends State<DealsScreen> {
                           ],
                         ],
                       ),
+                    ),
                     );
                   },
                 ),

@@ -1,4 +1,5 @@
 import '../config/api_config.dart';
+import '../models/dashboard_stats.dart';
 import '../models/categorie.dart';
 import '../models/ibeacon.dart';
 import '../models/produit.dart';
@@ -59,6 +60,16 @@ class MarketplaceService {
     }
   }
 
+  Future<DashboardStats> getDashboardStats() async {
+    final response = await _client.get(ApiConfig.standsDashboardStats);
+    if (response.statusCode != 200) {
+      throw ApiException(_client.extractError(response));
+    }
+    return DashboardStats.fromJson(
+      _client.decodeJson(response) as Map<String, dynamic>,
+    );
+  }
+
   Future<Stand> verrouillerPosition(String phoneMac) async {
     final response = await _client.post(ApiConfig.standsVerrouillerPosition, {
       'phone_mac': phoneMac,
@@ -83,6 +94,33 @@ class MarketplaceService {
       throw ApiException(_client.extractError(response));
     }
     return Categorie.fromJson(_client.decodeJson(response) as Map<String, dynamic>);
+  }
+
+  Future<Categorie> modifierCategorie({
+    required String categorieId,
+    String? nom,
+    String? description,
+    String? iconeUrl,
+  }) async {
+    final body = <String, dynamic>{};
+    if (nom != null) body['nom'] = nom;
+    if (description != null) body['description'] = description;
+    if (iconeUrl != null) body['icone_url'] = iconeUrl;
+
+    final response =
+        await _client.put(ApiConfig.categorieModification(categorieId), body);
+    if (response.statusCode != 200) {
+      throw ApiException(_client.extractError(response));
+    }
+    return Categorie.fromJson(_client.decodeJson(response) as Map<String, dynamic>);
+  }
+
+  Future<void> supprimerCategorie(String categorieId) async {
+    final response =
+        await _client.delete(ApiConfig.categorieSuppression(categorieId));
+    if (response.statusCode != 200) {
+      throw ApiException(_client.extractError(response));
+    }
   }
 
   Future<Produit> creerProduit({
@@ -182,6 +220,33 @@ class MarketplaceService {
       throw ApiException(_client.extractError(response));
     }
     return Promotion.fromJson(_client.decodeJson(response) as Map<String, dynamic>);
+  }
+
+  Future<Promotion> modifierPromotion({
+    required String promotionId,
+    String? titre,
+    String? description,
+    List<String>? produitsIds,
+  }) async {
+    final body = <String, dynamic>{};
+    if (titre != null) body['titre'] = titre;
+    if (description != null) body['description'] = description;
+    if (produitsIds != null) body['produits_ids'] = produitsIds;
+
+    final response =
+        await _client.put(ApiConfig.promotionModification(promotionId), body);
+    if (response.statusCode != 200) {
+      throw ApiException(_client.extractError(response));
+    }
+    return Promotion.fromJson(_client.decodeJson(response) as Map<String, dynamic>);
+  }
+
+  Future<void> supprimerPromotion(String promotionId) async {
+    final response =
+        await _client.delete(ApiConfig.promotionSuppression(promotionId));
+    if (response.statusCode != 200) {
+      throw ApiException(_client.extractError(response));
+    }
   }
 
   Future<List<Promotion>> getMesPromotions() async {

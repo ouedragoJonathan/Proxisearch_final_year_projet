@@ -1,22 +1,24 @@
 import 'package:flutter/material.dart';
 
+import '../models/categorie.dart';
 import '../models/produit.dart';
+import '../models/promotion.dart';
 import '../services/marketplace_service.dart';
 import '../theme/app_colors.dart';
 import '../utils/product_image_helper.dart';
 import 'add_product_screen.dart';
 import 'create_promotion_screen.dart';
+import 'edit_category_screen.dart';
 import 'edit_product_screen.dart';
+import 'edit_promotion_screen.dart';
 
 class CategoryProductsScreen extends StatefulWidget {
   const CategoryProductsScreen({
     super.key,
-    required this.categorieId,
-    required this.categorieNom,
+    required this.categorie,
   });
 
-  final String categorieId;
-  final String categorieNom;
+  final Categorie categorie;
 
   @override
   State<CategoryProductsScreen> createState() => _CategoryProductsScreenState();
@@ -41,7 +43,7 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
     });
     try {
       final produits =
-          await _service.getProduitsParCategorie(widget.categorieId);
+          await _service.getProduitsParCategorie(widget.categorie.id);
       if (!mounted) return;
       setState(() {
         _produits = produits;
@@ -57,6 +59,23 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
   }
 
   Future<void> _openPromotion(Produit produit) async {
+    if (produit.promotions.isNotEmpty) {
+      final promoBrief = produit.promotions.first;
+      var promotion = Promotion(
+        id: promoBrief.id,
+        titre: promoBrief.titre,
+      );
+      try {
+        final all = await _service.getMesPromotions();
+        promotion = all.firstWhere(
+          (p) => p.id == promoBrief.id,
+          orElse: () => promotion,
+        );
+      } catch (_) {}
+      await _openEditPromotion(promotion, produit.nom);
+      return;
+    }
+
     final created = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => CreatePromotionScreen(
@@ -68,12 +87,35 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
     if (created == true) _load();
   }
 
+  Future<void> _openEditPromotion(Promotion promotion, String? productName) async {
+    final updated = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => EditPromotionScreen(
+          promotion: promotion,
+          linkedProductName: productName,
+        ),
+      ),
+    );
+    if (updated == true) _load();
+  }
+
+  Future<void> _openEditCategory() async {
+    final updated = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => EditCategoryScreen(categorie: widget.categorie),
+      ),
+    );
+    if (updated == true && mounted) {
+      Navigator.of(context).pop(true);
+    }
+  }
+
   Future<void> _openAddProduct() async {
     final created = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => AddProductScreen(
-          categorieId: widget.categorieId,
-          categorieNom: widget.categorieNom,
+          categorieId: widget.categorie.id,
+          categorieNom: widget.categorie.nom,
         ),
       ),
     );
@@ -85,7 +127,7 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
       MaterialPageRoute(
         builder: (_) => EditProductScreen(
           produit: produit,
-          categorieNom: widget.categorieNom,
+          categorieNom: widget.categorie.nom,
         ),
       ),
     );
@@ -104,12 +146,18 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
           icon: const Icon(Icons.arrow_back, color: AppColors.darkOlive),
         ),
         title: Text(
-          widget.categorieNom,
+          widget.categorie.nom,
           style: const TextStyle(
             color: AppColors.darkOlive,
             fontWeight: FontWeight.bold,
           ),
         ),
+        actions: [
+          IconButton(
+            onPressed: _openEditCategory,
+            icon: const Icon(Icons.edit_outlined, color: AppColors.darkOlive),
+          ),
+        ],
       ),
       body: _buildBody(),
       floatingActionButton: FloatingActionButton(
@@ -267,8 +315,8 @@ class _CategoryProductsScreenState extends State<CategoryProductsScreen> {
                                   color: AppColors.limeGreen,
                                   shape: BoxShape.circle,
                                 ),
-                                child: const Icon(
-                                  Icons.add,
+                                child: Icon(
+                                  hasPromo ? Icons.edit : Icons.add,
                                   size: 16,
                                   color: AppColors.darkOlive,
                                 ),

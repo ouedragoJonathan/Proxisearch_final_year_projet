@@ -23,8 +23,9 @@ _displayed_time: Dict[str, float] = {}
 _last_rssi_used: Dict[str, dict[str, float]] = {}
 
 MAX_HUMAN_SPEED_M_S = 1.5
-MAX_SMOOTH_ALPHA = 0.4
-RSSI_STABLE_THRESHOLD_DB = 2.5
+MAX_SMOOTH_ALPHA = 0.25
+RSSI_STABLE_THRESHOLD_DB = 3.0
+MIN_DISPLAY_MOVE_M = 0.20
 
 
 def _hold_displayed_position(phone_id: str) -> tuple[float, float]:
@@ -92,6 +93,12 @@ def process_position(
 
     clamped = clamp_position(phone_id, raw_pos)
     smoothed = smooth_position(phone_id, clamped, tau=tau, max_alpha=MAX_SMOOTH_ALPHA)
+
+    if phone_id in _displayed_position:
+        last_x, last_y = _displayed_position[phone_id]
+        if math.hypot(smoothed[0] - last_x, smoothed[1] - last_y) < MIN_DISPLAY_MOVE_M:
+            return _hold_displayed_position(phone_id)
+
     _displayed_position[phone_id] = smoothed
     _displayed_time[phone_id] = time.time()
     _last_rssi_used[phone_id] = {"A": rssi_a, "B": rssi_b, "C": rssi_c}

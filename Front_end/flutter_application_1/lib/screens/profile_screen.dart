@@ -74,12 +74,6 @@ class ProfileScreen extends StatelessWidget {
             ),
             const SizedBox(height: 28),
             _MenuTile(
-              icon: Icons.dashboard_outlined,
-              label: 'Dashboard',
-              onTap: () {},
-            ),
-            const SizedBox(height: 12),
-            _MenuTile(
               icon: Icons.sensors_outlined,
               label: 'iBeacon Management',
               onTap: () {

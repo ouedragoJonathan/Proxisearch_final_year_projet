@@ -5,7 +5,8 @@ from app.models.promotion import Promotion
 from app.models.produits import Produit
 from app.models.stand import Stand
 from app.models.vendeur import Vendeur
-from app.schemas.promotion import PromotionCreate, PromotionUpdate
+from app.schemas.promotion import PromotionCreate, PromotionUpdate, PromotionResponse
+from app.services.stand_service import StandService
 from app.models.ibeacon import IBeacon
 from app.core.ibeacon_uuid import variantes_uuid
 from beanie.operators import In
@@ -13,27 +14,41 @@ from beanie.operators import In
 class PromotionService:
 
     @staticmethod
+    def _to_response(promotion: Promotion) -> PromotionResponse:
+        return PromotionResponse(
+            id=promotion.id,
+            titre=promotion.titre,
+            description=promotion.description,
+        )
+
+    @staticmethod
     async def verifier_produits_vendeur(produits_ids: List[PydanticObjectId], vendeur_actuel: Vendeur) -> List[Produit]:
         """Vérifie que chaque produit d'une liste appartient bien au vendeur connecté."""
+        if not produits_ids:
+            raise HTTPException(
+                status_code=400,
+                detail="Sélectionnez au moins un produit pour la promotion.",
+            )
+
         produits_valides = []
         for pid in produits_ids:
             produit = await Produit.get(pid)
             if not produit:
                 raise HTTPException(status_code=404, detail=f"Produit {pid} introuvable.")
-            
-            stand = await Stand.find_one(Stand.categories.id == produit.categorie_id)
+
+            stand = await StandService.trouver_par_categorie(produit.categorie_id)
             if not stand:
                 raise HTTPException(status_code=404, detail=f"Stand introuvable pour le produit {pid}.")
-                
+
             await stand.fetch_link(Stand.vendeur)
             if stand.vendeur.id != vendeur_actuel.id:
                 raise HTTPException(status_code=403, detail="Non autorisé sur un des produits.")
-                
+
             produits_valides.append(produit)
         return produits_valides
 
     @staticmethod
-    async def creer_promotion(donnees: PromotionCreate, vendeur_actuel: Vendeur) -> Promotion:
+    async def creer_promotion(donnees: PromotionCreate, vendeur_actuel: Vendeur) -> PromotionResponse:
         # 1. Vérifier tous les produits ciblés
         produits = await PromotionService.verifier_produits_vendeur(donnees.produits_ids, vendeur_actuel)
         
@@ -53,10 +68,10 @@ class PromotionService:
             produit.promotions.append(nouvelle_promo)
             await produit.save()
             
-        return nouvelle_promo
+        return PromotionService._to_response(nouvelle_promo)
 
     @staticmethod
-    async def modifier_promotion(promotion_id: PydanticObjectId, donnees: PromotionUpdate, vendeur_actuel: Vendeur) -> Promotion:
+    async def modifier_promotion(promotion_id: PydanticObjectId, donnees: PromotionUpdate, vendeur_actuel: Vendeur) -> PromotionResponse:
         # 1. Vérification directe grâce au vendeur_id
         promotion = await Promotion.find_one(Promotion.id == promotion_id, Promotion.vendeur_id == vendeur_actuel.id)
         if not promotion:
@@ -96,7 +111,7 @@ class PromotionService:
         if donnees.titre is not None: promotion.titre = donnees.titre
         if donnees.description is not None: promotion.description = donnees.description
         await promotion.save()
-        return promotion
+        return PromotionService._to_response(promotion)
 
     @staticmethod
     async def supprimer_promotion(promotion_id: PydanticObjectId, vendeur_actuel: Vendeur):
@@ -145,10 +160,13 @@ class PromotionService:
         stand = await Stand.find_one(Stand.vendeur.id == ibeacon.vendeur_id)
         nom_stand = stand.nom_du_stand if stand else "Stand inconnu"
         
+        stand_id = str(stand.id) if stand else None
+
         if not promotions:
             return {
-                "message": f"Bienvenue chez {nom_stand} ! Aucune promotion en cours.", 
+                "message": f"Bienvenue chez {nom_stand} ! Aucune promotion en cours.",
                 "nom_stand": nom_stand,
+                "stand_id": stand_id,
                 "promotions": []
             }
 
@@ -156,6 +174,7 @@ class PromotionService:
         return {
             "vendeur_id": str(ibeacon.vendeur_id),
             "nom_stand": nom_stand,
+            "stand_id": stand_id,
             "promotions": [
                 {
                     "id": str(p.id),
@@ -167,5 +186,6 @@ class PromotionService:
         }
 
     @staticmethod
-    async def lister_promotions_vendeur(vendeur_actuel: Vendeur) -> list[Promotion]:
-        return await Promotion.find(Promotion.vendeur_id == vendeur_actuel.id).to_list()
+    async def lister_promotions_vendeur(vendeur_actuel: Vendeur) -> list[PromotionResponse]:
+        promos = await Promotion.find(Promotion.vendeur_id == vendeur_actuel.id).to_list()
+        return [PromotionService._to_response(p) for p in promos]

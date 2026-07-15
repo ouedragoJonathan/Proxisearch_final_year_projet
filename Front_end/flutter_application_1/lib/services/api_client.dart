@@ -98,7 +98,22 @@ class ApiClient {
       final body = jsonDecode(response.body);
       if (body is Map<String, dynamic>) {
         final detail = body['detail'];
-        if (detail is String) return detail;
+        if (detail is String && detail.isNotEmpty) return detail;
+        if (detail is List) {
+          final messages = detail
+              .whereType<Map<String, dynamic>>()
+              .map((item) {
+                final loc = item['loc'];
+                final msg = item['msg']?.toString() ?? '';
+                if (loc is List && loc.isNotEmpty) {
+                  return '${loc.last}: $msg';
+                }
+                return msg;
+              })
+              .where((m) => m.isNotEmpty)
+              .toList();
+          if (messages.isNotEmpty) return messages.join('\n');
+        }
       }
     } catch (_) {}
     return 'Erreur serveur (${response.statusCode}).';

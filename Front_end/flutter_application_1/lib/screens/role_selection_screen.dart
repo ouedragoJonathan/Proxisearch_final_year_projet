@@ -19,7 +19,6 @@ class RoleSelectionScreen extends StatefulWidget {
 }
 
 class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
-  static const _logoPath = 'assets/images/proxisearch_logo.png';
   bool _loadingAcheteur = false;
 
   Future<void> _selectAcheteur() async {
@@ -67,67 +66,100 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.cream,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Column(
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFFD8E8CC),
+              Color(0xFFE6EFE0),
+              Color(0xFFF5F2EC),
+            ],
+            stops: [0.0, 0.4, 1.0],
+          ),
+        ),
+        child: SafeArea(
+          child: Stack(
             children: [
-              const SizedBox(height: 32),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+              Column(
                 children: [
-                  Image.asset(
-                    _logoPath,
-                    width: 36,
-                    height: 36,
-                    fit: BoxFit.contain,
+                  const SizedBox(height: 28),
+                  const ProxiSearchTitle(fontSize: 18),
+                  const Spacer(flex: 2),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 24),
+                    child: Text(
+                      'Qui êtes-vous ?',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontFamily: 'Georgia',
+                        fontSize: 40,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.darkOlive,
+                        height: 1.15,
+                      ),
+                    ),
                   ),
-                  const SizedBox(width: 10),
-                  const ProxiSearchTitle(fontSize: 24),
+                  const Spacer(flex: 3),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: SizedBox(
+                      height: 150,
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Positioned(
+                            top: 0,
+                            left: 0,
+                            right: 48,
+                            child: _RolePill(
+                              label: 'Acheter',
+                              icon: Icons.shopping_bag_outlined,
+                              iconOnLeft: true,
+                              backgroundColor: AppColors.white,
+                              loading: _loadingAcheteur,
+                              onTap: _selectAcheteur,
+                            ),
+                          ),
+                          Positioned(
+                            top: 78,
+                            left: 48,
+                            right: 0,
+                            child: _RolePill(
+                              label: 'Vendre',
+                              icon: Icons.storefront_outlined,
+                              iconOnLeft: false,
+                              backgroundColor:
+                                  AppColors.sageGreen.withValues(alpha: 0.65),
+                              onTap: _selectVendeur,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 140),
                 ],
               ),
-              const SizedBox(height: 48),
-              const Text(
-                'Comment souhaitez-vous\nutiliser ProxiSearch ?',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.darkOlive,
-                  height: 1.3,
-                ),
-              ),
-              const SizedBox(height: 36),
-              _RoleCard(
-                icon: Icons.shopping_bag_outlined,
-                title: 'Je fais mes achats',
-                subtitle: 'Découvrir les produits locaux',
-                loading: _loadingAcheteur,
-                onTap: _selectAcheteur,
-              ),
-              const SizedBox(height: 16),
-              _RoleCard(
-                icon: Icons.storefront_outlined,
-                title: 'Je suis commerçant',
-                subtitle: 'Vendre et gérer ma boutique',
-                onTap: _selectVendeur,
-              ),
-              const Spacer(),
-              TextButton(
-                onPressed: () async {
-                  await TokenStorage.clearSession();
-                  if (!context.mounted) return;
-                  Navigator.of(context).pop();
-                },
-                child: Text(
-                  'Retour',
-                  style: TextStyle(
-                    color: AppColors.textGrey.withValues(alpha: 0.8),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 16,
+                child: TextButton(
+                  onPressed: () async {
+                    await TokenStorage.clearSession();
+                    if (!context.mounted) return;
+                    Navigator.of(context).pop();
+                  },
+                  child: Text(
+                    'Retour',
+                    style: TextStyle(
+                      color: AppColors.textGrey.withValues(alpha: 0.8),
+                    ),
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
             ],
           ),
         ),
@@ -136,81 +168,90 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
   }
 }
 
-class _RoleCard extends StatelessWidget {
-  const _RoleCard({
+class _RolePill extends StatelessWidget {
+  const _RolePill({
+    required this.label,
     required this.icon,
-    required this.title,
-    required this.subtitle,
+    required this.iconOnLeft,
+    required this.backgroundColor,
     required this.onTap,
     this.loading = false,
   });
 
+  final String label;
   final IconData icon;
-  final String title;
-  final String subtitle;
+  final bool iconOnLeft;
+  final Color backgroundColor;
   final VoidCallback onTap;
   final bool loading;
 
   @override
   Widget build(BuildContext context) {
+    final iconWidget = Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        color: AppColors.white.withValues(alpha: iconOnLeft ? 1 : 0.95),
+        shape: BoxShape.circle,
+      ),
+      child: loading
+          ? const Padding(
+              padding: EdgeInsets.all(10),
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: AppColors.oliveGreen,
+              ),
+            )
+          : Icon(icon, color: AppColors.oliveGreen, size: 22),
+    );
+
+    final textWidget = Column(
+      crossAxisAlignment:
+          iconOnLeft ? CrossAxisAlignment.start : CrossAxisAlignment.end,
+      children: [
+        Text(
+          'JE SOUHAITE',
+          style: TextStyle(
+            fontSize: 11,
+            letterSpacing: 0.8,
+            fontWeight: FontWeight.w600,
+            color: AppColors.oliveGreen.withValues(alpha: 0.85),
+          ),
+        ),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            color: AppColors.darkOlive,
+          ),
+        ),
+      ],
+    );
+
     return Material(
-      color: AppColors.white,
-      borderRadius: BorderRadius.circular(16),
+      color: backgroundColor,
+      borderRadius: BorderRadius.circular(48),
+      elevation: 3,
+      shadowColor: Colors.black.withValues(alpha: 0.1),
       child: InkWell(
         onTap: loading ? null : onTap,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(48),
         child: Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.lightGrey),
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 20),
           child: Row(
-            children: [
-              Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  color: AppColors.lightGrey.withValues(alpha: 0.6),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, color: AppColors.darkOlive, size: 26),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.darkOlive,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: AppColors.textGrey.withValues(alpha: 0.85),
-                      ),
-                    ),
+            children: iconOnLeft
+                ? [
+                    iconWidget,
+                    const SizedBox(width: 16),
+                    Expanded(child: textWidget),
+                  ]
+                : [
+                    Expanded(child: textWidget),
+                    const SizedBox(width: 16),
+                    iconWidget,
                   ],
-                ),
-              ),
-              if (loading)
-                const SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: AppColors.oliveGreen,
-                  ),
-                ),
-            ],
           ),
         ),
       ),

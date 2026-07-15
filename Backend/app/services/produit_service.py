@@ -1,26 +1,32 @@
+import logging
 import random
 from bson import ObjectId
 from fastapi import HTTPException, status
 from beanie import PydanticObjectId
 from app.models.produits import Produit
 from app.models.categories import Categorie
+from app.models.promotion import Promotion
 from app.models.stand import Stand
 from app.models.vendeur import Vendeur
-from app.schemas.produit import ProduitsCreate, ProduitsUpdate
+from app.schemas.produit import ProduitsCreate, ProduitsUpdate, ProduitsResponse
+from app.schemas.promotion import PromotionResponse
 from app.services.rag_service import RAGService
+from app.services.stand_service import StandService
+
+logger = logging.getLogger(__name__)
 
 class ProduitService:
 
     @staticmethod
-    async def verifier_permission_produit(categorie_id: PydanticObjectId, vendeur_actuel: Vendeur) -> Stand:
+    async def verifier_permission_produit(categorie_id: PydanticObjectId, vendeur_actuel: Vendeur):
         """Vérifie si la catégorie appartient à un stand possédé par le vendeur connecté."""
-        stand = await Stand.find_one(Stand.categories.id == categorie_id)
+        stand = await StandService.trouver_par_categorie(categorie_id)
         if not stand:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="La catégorie associée est introuvable."
             )
-        
+
         await stand.fetch_link(Stand.vendeur)
         if stand.vendeur.id != vendeur_actuel.id:
             raise HTTPException(
@@ -30,7 +36,33 @@ class ProduitService:
         return stand
 
     @staticmethod
-    async def creer_produit(donnees: ProduitsCreate, vendeur_actuel: Vendeur) -> Produit:
+    async def _promotions_to_response(produit: Produit) -> list[PromotionResponse]:
+        promos: list[PromotionResponse] = []
+        for item in produit.promotions or []:
+            if not isinstance(item, Promotion):
+                continue
+            promos.append(PromotionResponse(
+                id=item.id,
+                titre=item.titre,
+                description=item.description,
+            ))
+        return promos
+
+    @staticmethod
+    async def _to_response(produit: Produit) -> ProduitsResponse:
+        return ProduitsResponse(
+            id=produit.id,
+            nom=produit.nom,
+            description=produit.description,
+            prix=produit.prix,
+            disponibilte=produit.disponibilte,
+            photo_url=produit.photo_url,
+            categorie_id=produit.categorie_id,
+            promotions=await ProduitService._promotions_to_response(produit),
+        )
+
+    @staticmethod
+    async def creer_produit(donnees: ProduitsCreate, vendeur_actuel: Vendeur) -> ProduitsResponse:
         # 1. Vérification de sécurité
         await ProduitService.verifier_permission_produit(donnees.categorie_id, vendeur_actuel)
         
@@ -53,12 +85,16 @@ class ProduitService:
             categorie.produits.append(nouveau_produit)
             await categorie.save()
 
-        await RAGService.synchroniser_produit(nouveau_produit)
-            
-        return await ProduitService._enrichir_produit(nouveau_produit)
+        try:
+            await RAGService.synchroniser_produit(nouveau_produit)
+        except Exception as exc:
+            logger.warning("Sync RAG ignorée pour le produit %s : %s", nouveau_produit.id, exc)
+
+        await ProduitService._enrichir_produit(nouveau_produit)
+        return await ProduitService._to_response(nouveau_produit)
 
     @staticmethod
-    async def modifier_produit(produit_id: PydanticObjectId, donnees: ProduitsUpdate, vendeur_actuel: Vendeur) -> Produit:
+    async def modifier_produit(produit_id: PydanticObjectId, donnees: ProduitsUpdate, vendeur_actuel: Vendeur) -> ProduitsResponse:
         # 1. Trouver la catégorie contenant ce produit pour vérifier les droits
         categorie = await Categorie.find_one(Categorie.produits.id == produit_id)
         if not categorie:
@@ -80,8 +116,12 @@ class ProduitService:
             setattr(produit, key, value)
             
         await produit.save()
-        await RAGService.synchroniser_produit(produit)
-        return await ProduitService._enrichir_produit(produit)
+        try:
+            await RAGService.synchroniser_produit(produit)
+        except Exception as exc:
+            logger.warning("Sync RAG ignorée pour le produit %s : %s", produit.id, exc)
+        await ProduitService._enrichir_produit(produit)
+        return await ProduitService._to_response(produit)
 
     @staticmethod
     async def supprimer_produit(produit_id: PydanticObjectId, vendeur_actuel: Vendeur):
@@ -122,7 +162,7 @@ class ProduitService:
     async def lister_produits_par_categorie(
         categorie_id: PydanticObjectId,
         vendeur_actuel: Vendeur
-    ) -> list[Produit]:
+    ) -> list[ProduitsResponse]:
         await ProduitService.verifier_permission_produit(categorie_id, vendeur_actuel)
         categorie = await Categorie.get(categorie_id)
         if not categorie:
@@ -132,12 +172,12 @@ class ProduitService:
             )
 
         await categorie.fetch_link(Categorie.produits)
-        produits = []
+        resultats: list[ProduitsResponse] = []
         for produit in categorie.produits or []:
             if hasattr(produit, "fetch_link"):
                 await produit.fetch_link(Produit.promotions)
-            produits.append(produit)
-        return produits
+            resultats.append(await ProduitService._to_response(produit))
+        return resultats
 
     @staticmethod
     async def rechercher_produits(query: str) -> list[Produit]:

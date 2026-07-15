@@ -21,6 +21,20 @@ class VerrouillerPositionRequest(BaseModel):
     phone_mac: str
 
 
+class NotificationClickRequest(BaseModel):
+    stand_id: str
+
+
+class DashboardStatsResponse(BaseModel):
+    nom_stand: str
+    clics_notif: int
+    produits_disponibles: int
+    total_produits: int
+    nombre_categories: int
+    promotions_actives: int
+    position_verrouillee: bool
+
+
 class StandResponse(BaseModel):
     id: PydanticObjectId
     nom_du_stand: str

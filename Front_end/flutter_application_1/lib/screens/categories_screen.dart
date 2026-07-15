@@ -6,6 +6,7 @@ import '../theme/app_colors.dart';
 import '../utils/category_icon_helper.dart';
 import 'add_category_screen.dart';
 import 'category_products_screen.dart';
+import 'edit_category_screen.dart';
 
 class CategoriesScreen extends StatefulWidget {
   const CategoriesScreen({super.key});
@@ -52,6 +53,15 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
       MaterialPageRoute(builder: (_) => const AddCategoryScreen()),
     );
     if (created == true) _load();
+  }
+
+  Future<void> _openEditCategory(Categorie categorie) async {
+    final updated = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => EditCategoryScreen(categorie: categorie),
+      ),
+    );
+    if (updated == true) _load();
   }
 
   @override
@@ -140,7 +150,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                     crossAxisCount: 2,
                     mainAxisSpacing: 14,
                     crossAxisSpacing: 14,
-                    childAspectRatio: 1.05,
+                    childAspectRatio: 0.88,
                   ),
                   delegate: SliverChildBuilderDelegate(
                     (context, index) {
@@ -151,13 +161,13 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
                           await Navigator.of(context).push(
                             MaterialPageRoute(
                               builder: (_) => CategoryProductsScreen(
-                                categorieId: categorie.id,
-                                categorieNom: categorie.nom,
+                                categorie: categorie,
                               ),
                             ),
                           );
                           _load();
                         },
+                        onEdit: () => _openEditCategory(categorie),
                       );
                     },
                     childCount: _categories.length,
@@ -172,10 +182,15 @@ class _CategoriesScreenState extends State<CategoriesScreen> {
 }
 
 class _CategoryCard extends StatelessWidget {
-  const _CategoryCard({required this.categorie, required this.onTap});
+  const _CategoryCard({
+    required this.categorie,
+    required this.onTap,
+    required this.onEdit,
+  });
 
   final Categorie categorie;
   final VoidCallback onTap;
+  final VoidCallback onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -197,38 +212,62 @@ class _CategoryCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: double.infinity,
-              height: 90,
-              color: AppColors.lightGrey.withValues(alpha: 0.6),
-              child: Icon(
-                CategoryIconHelper.iconFor(categorie.iconeUrl),
-                color: AppColors.oliveGreen,
-                size: 40,
-              ),
+            Stack(
+              children: [
+                Container(
+                  width: double.infinity,
+                  height: 90,
+                  color: AppColors.lightGrey.withValues(alpha: 0.6),
+                  child: Icon(
+                    CategoryIconHelper.iconFor(categorie.iconeUrl),
+                    color: AppColors.oliveGreen,
+                    size: 40,
+                  ),
+                ),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: GestureDetector(
+                    onTap: onEdit,
+                    child: Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: AppColors.white.withValues(alpha: 0.9),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.edit_outlined,
+                        size: 14,
+                        color: AppColors.darkOlive,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(14, 10, 14, 14),
+                padding: const EdgeInsets.fromLTRB(14, 8, 14, 12),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.end,
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
                       categorie.nom,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        fontSize: 16,
+                        fontSize: 15,
                         fontWeight: FontWeight.bold,
                         color: AppColors.darkOlive,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 2),
                     Text(
                       '${categorie.productCount} Product${categorie.productCount > 1 ? 's' : ''}',
                       style: TextStyle(
-                        fontSize: 13,
+                        fontSize: 12,
                         color: AppColors.textGrey.withValues(alpha: 0.85),
                       ),
                     ),

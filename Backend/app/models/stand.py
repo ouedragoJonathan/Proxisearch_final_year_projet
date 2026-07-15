@@ -11,6 +11,7 @@ class Stand(Document):
     position_y: Optional[float] = None
     position_verrouillee: bool = False
     phone_mac: Optional[str] = None
+    clics_notif: int = 0
     vendeur: Link[Vendeur]
     categories: List[Link[Categorie]] = []
 

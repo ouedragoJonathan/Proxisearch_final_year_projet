@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import '../widgets/app_bottom_nav_bar.dart';
 import 'categories_screen.dart';
+import 'dashboard_screen.dart';
 import 'deals_screen.dart';
-import 'home_screen.dart';
 import 'profile_screen.dart';
 import 'search_screen.dart';
 
@@ -31,12 +31,7 @@ class _MainShellState extends State<MainShell> {
   void initState() {
     super.initState();
     _screens = [
-      HomeScreen(
-        vendeurId: widget.vendeurId,
-        numTelephone: widget.numTelephone,
-        onNavigateToCategories: () => setState(() => _selectedIndex = 3),
-        onNavigateToSearch: () => setState(() => _selectedIndex = 1),
-      ),
+      const DashboardScreen(),
       const SearchScreen(),
       const DealsScreen(),
       const CategoriesScreen(),

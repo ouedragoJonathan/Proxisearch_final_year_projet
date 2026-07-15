@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
 import '../services/phone_mac_storage.dart';
 import '../services/position_service.dart';
 import '../theme/app_colors.dart';
+import '../utils/movement_trail.dart';
 
 class NavigationMapScreen extends StatefulWidget {
   const NavigationMapScreen({
@@ -35,6 +37,7 @@ class _NavigationMapScreenState extends State<NavigationMapScreen> {
   List<PhonePosition> _detectedPhones = [];
   String? _selectedMac;
   bool _detecting = false;
+  final _movementTrail = MovementTrail();
 
   @override
   void initState() {
@@ -124,6 +127,7 @@ class _NavigationMapScreenState extends State<NavigationMapScreen> {
       _error = null;
       _data = null;
     });
+    _movementTrail.reset();
     await _refresh();
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (_) => _refresh());
@@ -136,6 +140,7 @@ class _NavigationMapScreenState extends State<NavigationMapScreen> {
     _detectTimer = null;
     _mac = null;
     _data = null;
+    _movementTrail.reset();
     await PhoneMacStorage.clear();
     await _scanForPhones(autoStartIfSingle: false);
   }
@@ -148,6 +153,7 @@ class _NavigationMapScreenState extends State<NavigationMapScreen> {
         standId: widget.standId,
       );
       if (!mounted) return;
+      _movementTrail.add(data.buyer);
       setState(() {
         _data = data;
         _error = null;
@@ -244,12 +250,34 @@ class _NavigationMapScreenState extends State<NavigationMapScreen> {
                           )
                         : LayoutBuilder(
                             builder: (context, constraints) {
-                              return CustomPaint(
-                                size: Size(
-                                  constraints.maxWidth,
-                                  constraints.maxHeight,
+                              return DecoratedBox(
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: AppColors.lightGrey,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.black.withValues(alpha: 0.06),
+                                      blurRadius: 8,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
                                 ),
-                                painter: _MarketMapPainter(data: _data!),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: CustomPaint(
+                                    size: Size(
+                                      constraints.maxWidth,
+                                      constraints.maxHeight,
+                                    ),
+                                    painter: _MarketMapPainter(
+                                      data: _data!,
+                                      trail: _movementTrail.points,
+                                    ),
+                                  ),
+                                ),
                               );
                             },
                           ),
@@ -267,8 +295,8 @@ class _NavigationMapScreenState extends State<NavigationMapScreen> {
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.storefront,
-                              color: AppColors.oliveGreen),
+                          const Icon(Icons.location_on,
+                              color: Color(0xFFE53935)),
                           const SizedBox(width: 10),
                           Expanded(
                             child: Column(
@@ -489,9 +517,10 @@ class _NavigationMapScreenState extends State<NavigationMapScreen> {
 }
 
 class _MarketMapPainter extends CustomPainter {
-  _MarketMapPainter({required this.data});
+  _MarketMapPainter({required this.data, required this.trail});
 
   final NavigationData data;
+  final List<MapPoint> trail;
 
   static const _espColors = {
     'A': Color(0xFFE53935),
@@ -505,13 +534,62 @@ class _MarketMapPainter extends CustomPainter {
     return Offset(x * scaleX, size.height - y * scaleY);
   }
 
+  void _drawGpsPin(Canvas canvas, Offset tip, {double height = 30}) {
+    const pinColor = Color(0xFFE53935);
+    final width = height * 0.58;
+    final radius = width / 2;
+    final bulbCenter = Offset(tip.dx, tip.dy - height + radius);
+
+    final pinPath = Path()
+      ..moveTo(tip.dx, tip.dy)
+      ..quadraticBezierTo(
+        tip.dx + radius * 1.15,
+        bulbCenter.dy + radius * 0.35,
+        tip.dx + radius,
+        bulbCenter.dy,
+      )
+      ..arcTo(
+        Rect.fromCircle(center: bulbCenter, radius: radius),
+        0,
+        math.pi,
+        false,
+      )
+      ..quadraticBezierTo(
+        tip.dx - radius * 1.15,
+        bulbCenter.dy + radius * 0.35,
+        tip.dx,
+        tip.dy,
+      )
+      ..close();
+
+    canvas.drawPath(
+      pinPath,
+      Paint()
+        ..color = pinColor.withValues(alpha: 0.25)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
+    );
+    canvas.drawPath(pinPath, Paint()..color = pinColor);
+    canvas.drawPath(
+      pinPath,
+      Paint()
+        ..color = const Color(0xFFB71C1C)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.2,
+    );
+    canvas.drawCircle(
+      bulbCenter,
+      radius * 0.38,
+      Paint()..color = Colors.white,
+    );
+  }
+
   @override
   void paint(Canvas canvas, Size size) {
-    final bg = Paint()..color = const Color(0xFF16213E);
+    final bg = Paint()..color = Colors.white;
     canvas.drawRect(Offset.zero & size, bg);
 
     final gridPaint = Paint()
-      ..color = const Color(0xFF2A2A4A)
+      ..color = const Color(0xFFE8E8E8)
       ..strokeWidth = 0.5;
     for (double x = 0; x <= data.roomWidth; x += 0.4) {
       final p = _toScreen(x, 0, size);
@@ -522,20 +600,44 @@ class _MarketMapPainter extends CustomPainter {
       canvas.drawLine(Offset(0, p.dy), Offset(size.width, p.dy), gridPaint);
     }
 
+    final majorGridPaint = Paint()
+      ..color = const Color(0xFFD0D0D0)
+      ..strokeWidth = 0.8;
+    for (double x = 0; x <= data.roomWidth; x += 1.0) {
+      final p = _toScreen(x, 0, size);
+      canvas.drawLine(
+        Offset(p.dx, 0),
+        Offset(p.dx, size.height),
+        majorGridPaint,
+      );
+    }
+    for (double y = 0; y <= data.roomHeight; y += 1.0) {
+      final p = _toScreen(0, y, size);
+      canvas.drawLine(
+        Offset(0, p.dy),
+        Offset(size.width, p.dy),
+        majorGridPaint,
+      );
+    }
+
     final border = Paint()
-      ..color = const Color(0xFF4FC3F7)
+      ..color = AppColors.oliveGreen.withValues(alpha: 0.45)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2;
     canvas.drawRect(Offset.zero & size, border);
 
     for (final entry in data.espPositions.entries) {
-      final color = _espColors[entry.key] ?? Colors.white;
+      final color = _espColors[entry.key] ?? AppColors.textGrey;
       final p = _toScreen(entry.value.x, entry.value.y, size);
       canvas.drawCircle(p, 6, Paint()..color = color);
       final tp = TextPainter(
         text: TextSpan(
           text: 'ESP ${entry.key}',
-          style: const TextStyle(color: Colors.white, fontSize: 10),
+          style: const TextStyle(
+            color: AppColors.textGrey,
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+          ),
         ),
         textDirection: TextDirection.ltr,
       );
@@ -543,42 +645,39 @@ class _MarketMapPainter extends CustomPainter {
       tp.paint(canvas, Offset(p.dx + 8, p.dy - 6));
     }
 
-    if (data.path.length >= 2) {
-      final pathPaint = Paint()
-        ..color = const Color(0xFFFF9800)
-        ..strokeWidth = 3
+    if (trail.length >= 2) {
+      final trailPaint = Paint()
+        ..color = AppColors.oliveGreen.withValues(alpha: 0.75)
+        ..strokeWidth = 3.5
         ..style = PaintingStyle.stroke
-        ..strokeCap = StrokeCap.round;
-      final path = Path();
-      final first = _toScreen(data.path.first.x, data.path.first.y, size);
-      path.moveTo(first.dx, first.dy);
-      for (int i = 1; i < data.path.length; i++) {
-        final pt = _toScreen(data.path[i].x, data.path[i].y, size);
-        path.lineTo(pt.dx, pt.dy);
-      }
-      canvas.drawPath(path, pathPaint);
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round;
+      final trailPath = MovementTrail.buildSmoothPath(
+        trail,
+        (p) => _toScreen(p.x, p.y, size),
+      );
+      canvas.drawPath(trailPath, trailPaint);
     }
 
-    final standPt = _toScreen(data.stand.x, data.stand.y, size);
-    canvas.drawCircle(
-      standPt,
-      10,
-      Paint()..color = AppColors.oliveGreen,
-    );
-    canvas.drawCircle(
-      standPt,
-      10,
-      Paint()
-        ..color = Colors.white
+    if (data.path.length >= 2) {
+      final pathPaint = Paint()
+        ..color = AppColors.searchOrange.withValues(alpha: 0.85)
+        ..strokeWidth = 2.5
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2,
-    );
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round;
+      final routePath = MovementTrail.buildSmoothPath(
+        data.path,
+        (p) => _toScreen(p.x, p.y, size),
+      );
+      canvas.drawPath(routePath, pathPaint);
+    }
 
     final buyerPt = _toScreen(data.buyer.x, data.buyer.y, size);
     canvas.drawCircle(
       buyerPt,
       9,
-      Paint()..color = const Color(0xFF4FC3F7),
+      Paint()..color = const Color(0xFF1E88E5),
     );
     canvas.drawCircle(
       buyerPt,
@@ -588,12 +687,16 @@ class _MarketMapPainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = 2,
     );
+
+    final standPt = _toScreen(data.stand.x, data.stand.y, size);
+    _drawGpsPin(canvas, standPt);
   }
 
   @override
   bool shouldRepaint(covariant _MarketMapPainter oldDelegate) {
     return oldDelegate.data.buyer.x != data.buyer.x ||
         oldDelegate.data.buyer.y != data.buyer.y ||
-        oldDelegate.data.path.length != data.path.length;
+        oldDelegate.data.path.length != data.path.length ||
+        oldDelegate.trail.length != trail.length;
   }
 }
